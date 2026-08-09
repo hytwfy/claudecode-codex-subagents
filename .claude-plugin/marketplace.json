@@ -1,0 +1,15 @@
+{
+  "name": "codex-subagents",
+  "owner": {
+    "name": "CoderMageFox"
+  },
+  "description": "Claude Code plugins for orchestrating parallel Codex subagents",
+  "plugins": [
+    {
+      "name": "codex-subagents",
+      "source": "./",
+      "description": "Orchestrate complex tasks through parallel Codex subagents",
+      "category": "orchestration"
+    }
+  ]
+}
