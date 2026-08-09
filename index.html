@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YüZhi Agent - 工作台</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    color: #1d2129;
+  }
+
+  body {
+    background: linear-gradient(135deg, #eef4fb 0%, #e8f1fa 40%, #e4eef9 100%);
+    overflow: hidden;
+  }
+
+  .app { display: flex; height: 100vh; }
+
+  /* ---------- 左侧边栏 ---------- */
+  .sidebar {
+    width: 56px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 0 16px;
+  }
+
+  .sidebar .menu-btn {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: #1d2129; border-radius: 8px;
+    margin-bottom: 26px;
+  }
+  .sidebar .menu-btn:hover { background: rgba(29, 33, 41, 0.06); }
+
+  .nav { display: flex; flex-direction: column; gap: 18px; }
+  .nav-item {
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: #1d2129; border-radius: 8px;
+  }
+  .nav-item:hover { background: rgba(29, 33, 41, 0.06); }
+  .nav-item.active {
+    background: #d6e4f8;
+    color: #1d6ae0;
+  }
+
+  .sidebar .spacer { flex: 1; }
+
+  .nav-item.settings { color: #4e5969; }
+
+  /* ---------- 主区域 ---------- */
+  .main {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 14px; right: 20px;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: #1d2129; border-radius: 8px;
+  }
+  .close-btn:hover { background: rgba(29, 33, 41, 0.06); }
+
+  .panel {
+    width: 100%;
+    max-width: 860px;
+    padding: 0 32px;
+    margin-top: -60px;
+  }
+
+  .brand {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    color: #0a68e0;
+    margin-bottom: 6px;
+  }
+
+  .headline-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .headline {
+    font-size: 16px;
+    color: #1d2129;
+  }
+
+  .folder-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #4e5969;
+  }
+
+  /* ---------- 输入框 ---------- */
+  .input-card {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(29, 33, 41, 0.04), 0 8px 24px rgba(29, 33, 41, 0.06);
+    padding: 16px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    height: 190px;
+  }
+
+  .input-card textarea {
+    flex: 1;
+    border: none;
+    outline: none;
+    resize: none;
+    font-size: 14px;
+    font-family: inherit;
+    color: #1d2129;
+    background: transparent;
+  }
+  .input-card textarea::placeholder { color: #86909c; }
+
+  .input-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+
+  .plus-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; background: transparent; cursor: pointer;
+    color: #1d2129; border-radius: 8px;
+  }
+  .plus-btn:hover { background: #f2f3f5; }
+
+  .input-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .model-select {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none; background: transparent; cursor: pointer;
+    font-size: 13px;
+    color: #4e5969;
+    font-family: inherit;
+  }
+  .model-select:hover { color: #1d2129; }
+
+  .send-btn {
+    width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    border: none; border-radius: 50%;
+    background: #1677ff;
+    cursor: pointer;
+    color: #ffffff;
+  }
+  .send-btn:hover { background: #3d8bff; }
+
+  /* ---------- 快捷功能 ---------- */
+  .quick-actions {
+    display: flex;
+    gap: 24px;
+    margin-top: 26px;
+  }
+
+  .action-card {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    transition: background 0.15s;
+  }
+  .action-card:hover { background: rgba(255, 255, 255, 0.7); }
+
+  .action-icon {
+    width: 40px; height: 40px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .action-text {
+    display: flex;
+    flex-direction: column;
+  }
+  .action-text .title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1d2129;
+    margin-bottom: 3px;
+  }
+  .action-text .desc {
+    font-size: 12px;
+    color: #86909c;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 左侧边栏 -->
+  <aside class="sidebar">
+    <button class="menu-btn" title="菜单">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="4" y1="6" x2="20" y2="6"/>
+        <line x1="4" y1="12" x2="20" y2="12"/>
+        <line x1="4" y1="18" x2="20" y2="18"/>
+      </svg>
+    </button>
+
+    <nav class="nav">
+      <button class="nav-item active" title="新建对话">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"/>
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+        </svg>
+      </button>
+      <button class="nav-item" title="搜索">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="7"/>
+          <line x1="21" y1="21" x2="16.5" y2="16.5"/>
+        </svg>
+      </button>
+      <button class="nav-item" title="文件夹">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h6l2 3h8a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/>
+        </svg>
+      </button>
+      <button class="nav-item" title="应用">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+      </button>
+      <button class="nav-item" title="更多">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </nav>
+
+    <div class="spacer"></div>
+
+    <button class="nav-item settings" title="设置">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/>
+      </svg>
+    </button>
+  </aside>
+
+  <!-- 主区域 -->
+  <main class="main">
+    <button class="close-btn" title="关闭">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="6" y1="6" x2="18" y2="18"/>
+        <line x1="18" y1="6" x2="6" y2="18"/>
+      </svg>
+    </button>
+
+    <div class="panel">
+      <div class="brand">YüZhi Agent</div>
+
+      <div class="headline-row">
+        <div class="headline">想从哪里开始呢？</div>
+        <div class="folder-chip">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 4h6l2 3h8a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/>
+          </svg>
+          默认文件夹
+        </div>
+      </div>
+
+      <!-- 输入卡片 -->
+      <div class="input-card">
+        <textarea placeholder="你只管描述问题，我来接手..."></textarea>
+        <div class="input-bar">
+          <button class="plus-btn" title="添加附件">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <line x1="12" y1="5" x2="12" y2="19"/>
+              <line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+          </button>
+          <div class="input-bar-right">
+            <button class="model-select">
+              DeepSeek V4 Flash
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <button class="send-btn" title="发送">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5"/>
+                <polyline points="5 12 12 5 19 12"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 快捷功能 -->
+      <div class="quick-actions">
+        <button class="action-card">
+          <span class="action-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1677ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+              <path d="M15 5l4 4"/>
+            </svg>
+          </span>
+          <span class="action-text">
+            <span class="title">分析文档</span>
+            <span class="desc">分析文档生成总结</span>
+          </span>
+        </button>
+
+        <button class="action-card">
+          <span class="action-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="3" width="20" height="18" rx="3" fill="#ffedd5" stroke="#f97316" stroke-width="1.4"/>
+              <text x="12" y="15.5" text-anchor="middle" font-size="6.5" font-weight="700" fill="#f97316" font-family="Arial">PPT</text>
+            </svg>
+          </span>
+          <span class="action-text">
+            <span class="title">制作PPT</span>
+            <span class="desc">基于内容生成PPT</span>
+          </span>
+        </button>
+
+        <button class="action-card">
+          <span class="action-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" stroke-linejoin="round">
+              <path d="M12 3a9 9 0 1 0 9 9h-9Z" fill="#1d4ed8" stroke="#1d4ed8" stroke-width="1"/>
+              <path d="M15 2.5A9 9 0 0 1 21.5 9H15Z" fill="#93c5fd" stroke="#93c5fd" stroke-width="1"/>
+            </svg>
+          </span>
+          <span class="action-text">
+            <span class="title">数据分析</span>
+            <span class="desc">基于数据生成图表</span>
+          </span>
+        </button>
+
+        <button class="action-card">
+          <span class="action-icon">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#1677ff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2 2 2 0 0 1-1.06-.3L8 15.5V8.5l8.94-4.2A2 2 0 0 1 18 4Z" fill="#dbe9ff"/>
+              <path d="M8 8.5H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h3"/>
+              <path d="M8 15.5V19a2 2 0 0 0 4 0v-1"/>
+            </svg>
+          </span>
+          <span class="action-text">
+            <span class="title">广告策略</span>
+            <span class="desc">生成宣传文案</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

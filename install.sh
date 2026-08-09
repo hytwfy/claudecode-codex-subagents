@@ -1,254 +1,299 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Codex Subagents Plugin - 一键安装脚本
-# 自动安装 Plugin 和 MCP 服务器
+# Codex Subagents Plugin - Cross-platform Installer (Bash)
+# Supports: macOS, Linux, WSL
+# Modes: interactive (default), --auto / CI=true (agent mode)
 
-set -e
+set -euo pipefail
 
-# 颜色定义
+# ── Mode detection ──
+AUTO_MODE=false
+if [[ "${1:-}" == "--auto" ]] || [[ "${CI:-false}" == "true" ]]; then
+    AUTO_MODE=true
+fi
+
+# ── Colors ──
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Codex Subagents Plugin 一键安装${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
+# ── Paths ──
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_DIR="${HOME}/.claude"
+PLUGINS_DIR="${CLAUDE_DIR}/plugins"
+COMMANDS_DIR="${CLAUDE_DIR}/commands"
+MCP_SETTINGS="${CLAUDE_DIR}/mcp_settings.json"
+SUMMARY_FILE="${SCRIPT_DIR}/.codex-subagents-install-summary.json"
 
-# 检查依赖并记录缺失项
-MISSING_DEPS=()
+# ── Result tracking ──
+RESULT_SUCCESS=true
+RESULT_OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
+RESULT_MODE="interactive"
+[[ "$AUTO_MODE" == true ]] && RESULT_MODE="auto"
+DEP_PYTHON3=false
+DEP_UVX=false
+DEP_CODEX=false
+ACT_DIRS=false
+ACT_PLUGIN=false
+ACT_COMMANDS=false
+ACT_MCP=false
+USER_ACTIONS=()
+ERRORS=()
 
-check_dependency() {
-    if ! command -v $1 &> /dev/null; then
-        MISSING_DEPS+=("$1")
-        echo -e "${RED}✗ 未找到: $1${NC}"
-        return 1
-    else
-        echo -e "${GREEN}✓ 已安装: $1${NC}"
-        return 0
+# ── Helpers ──
+print_header() {
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BLUE}  Codex Subagents Plugin Installer (Bash)${NC}"
+    if [[ "$AUTO_MODE" == true ]]; then
+        echo -e "${BLUE}  Mode: automatic (agent)${NC}"
+    fi
+    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+}
+
+print_success() { echo -e "${GREEN}✓ $1${NC}"; }
+print_warning() { echo -e "${YELLOW}⚠ $1${NC}"; }
+print_error() { echo -e "${RED}✗ $1${NC}"; }
+print_info() { echo -e "${CYAN}ℹ $1${NC}"; }
+
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+read_yes_no() {
+    local prompt="$1"
+    [[ "$AUTO_MODE" == true ]] && return 0
+    local response
+    while true; do
+        read -rp "${prompt} (y/n): " response
+        case "$response" in
+            [Yy]*) return 0 ;;
+            [Nn]*) return 1 ;;
+            *) echo "Please answer y or n." ;;
+        esac
+    done
+}
+
+add_user_action() {
+    local action="$1"
+    if [[ ! " ${USER_ACTIONS[*]} " =~ " ${action} " ]]; then
+        USER_ACTIONS+=("$action")
     fi
 }
 
-echo -e "${YELLOW}[1/6] 检查依赖...${NC}"
-check_dependency "python3"
-check_dependency "uvx"
-check_dependency "codex"
+add_error() {
+    local msg="$1"
+    RESULT_SUCCESS=false
+    ERRORS+=("$msg")
+    print_error "$msg"
+}
+
+# ── JSON summary writer (no jq required) ──
+write_summary() {
+    local exit_code="$1"
+    local actions_json="\"directories_created\": $([[ "$ACT_DIRS" == true ]] && echo true || echo false)"
+    actions_json+=", \"plugin_installed\": $([[ "$ACT_PLUGIN" == true ]] && echo true || echo false)"
+    actions_json+=", \"commands_installed\": $([[ "$ACT_COMMANDS" == true ]] && echo true || echo false)"
+    actions_json+=", \"mcp_configured\": $([[ "$ACT_MCP" == true ]] && echo true || echo false)"
+
+    local user_actions_json="[]"
+    if [[ ${#USER_ACTIONS[@]} -gt 0 ]]; then
+        user_actions_json="["
+        local first=true
+        for action in "${USER_ACTIONS[@]}"; do
+            [[ "$first" == true ]] || user_actions_json+=", "
+            first=false
+            user_actions_json+="\"$(echo "$action" | sed 's/\\/\\\\/g; s/"/\\"/g')\""
+        done
+        user_actions_json+="]"
+    fi
+
+    local errors_json="[]"
+    if [[ ${#ERRORS[@]} -gt 0 ]]; then
+        errors_json="["
+        local first=true
+        for err in "${ERRORS[@]}"; do
+            [[ "$first" == true ]] || errors_json+=", "
+            first=false
+            errors_json+="\"$(echo "$err" | sed 's/\\/\\\\/g; s/"/\\"/g')\""
+        done
+        errors_json+="]"
+    fi
+
+    cat > "$SUMMARY_FILE" <<EOF
+{
+  "success": $([[ "$RESULT_SUCCESS" == true ]] && echo true || echo false),
+  "os": "$RESULT_OS",
+  "mode": "$RESULT_MODE",
+  "exit_code": $exit_code,
+  "dependencies": {
+    "python3": $([[ "$DEP_PYTHON3" == true ]] && echo true || echo false),
+    "uvx": $([[ "$DEP_UVX" == true ]] && echo true || echo false),
+    "codex": $([[ "$DEP_CODEX" == true ]] && echo true || echo false)
+  },
+  "actions": {
+    $actions_json
+  },
+  "requires_user_action": $user_actions_json,
+  "errors": $errors_json
+}
+EOF
+}
+
+# ── Header ──
+print_header
+
+# ── 1. Dependency checks ──
+echo -e "${YELLOW}[1/5] Checking dependencies...${NC}"
+
+if command_exists python3; then
+    DEP_PYTHON3=true
+    print_success "python3: $(python3 --version 2>&1 | head -1)"
+elif command_exists python; then
+    print_warning "python3 not found, but python is available"
+    print_info "Consider creating a python3 symlink or alias"
+else
+    add_error "python3 is not installed"
+fi
+
+if command_exists uvx; then
+    DEP_UVX=true
+    print_success "uvx: $(uvx --version 2>&1 | head -1)"
+else
+    add_error "uvx is not installed"
+fi
+
+if command_exists codex; then
+    DEP_CODEX=true
+    print_success "codex: $(codex --version 2>&1 | head -1)"
+else
+    add_error "codex CLI is not installed"
+fi
+
 echo ""
 
-# 如果有缺失的依赖，提供安装指引
-if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
-    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${RED}  发现缺失的依赖${NC}"
-    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+# ── 2. Install missing dependencies ──
+if [[ "$DEP_PYTHON3" == false || "$DEP_UVX" == false || "$DEP_CODEX" == false ]]; then
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}  Missing dependencies${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 
-    for dep in "${MISSING_DEPS[@]}"; do
-        case $dep in
-            python3)
-                echo -e "${YELLOW}📦 Python 3${NC}"
-                echo -e "   将自动查找已安装的 Python 3 版本"
-                echo -e "   如未找到，请使用 Homebrew 安装:"
-                echo -e "   ${GREEN}brew install python3${NC}"
-                echo ""
-                ;;
-            uvx)
-                echo -e "${YELLOW}📦 uv (Python 包管理器)${NC}"
-                echo -e "   将自动安装 uv"
-                echo ""
-                ;;
-            codex)
-                echo -e "${YELLOW}📦 Codex CLI${NC}"
-                echo -e "   将自动安装 Codex CLI"
-                echo -e "   需要 npm (Node.js 包管理器)"
-                echo ""
-                ;;
-        esac
-    done
+    if [[ "$DEP_PYTHON3" == false ]]; then
+        print_warning "Python 3"
+        echo "   Install via your package manager, e.g.:"
+        echo "   brew install python3"
+        echo "   apt install python3"
+        add_user_action "Install Python 3 (e.g., brew install python3 or apt install python3)"
+    fi
 
-    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${YELLOW}是否自动安装缺失的依赖? (y/n)${NC}"
-    read -r response
-
-    if [[ "$response" =~ ^[Yy]$ ]]; then
-        echo ""
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${BLUE}  开始自动安装依赖${NC}"
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo ""
-
-        INSTALL_SUCCESS=true
-        NEED_CODEX_LOGIN=false
-
-        for dep in "${MISSING_DEPS[@]}"; do
-            case $dep in
-                python3)
-                    echo -e "${YELLOW}[Python 3] 检测中...${NC}"
-                    # 尝试查找 Python 3
-                    if command -v python3.11 &> /dev/null; then
-                        echo -e "${GREEN}✓ 找到 Python 3.11${NC}"
-                        ln -sf $(which python3.11) /usr/local/bin/python3 2>/dev/null || true
-                    elif command -v python3.10 &> /dev/null; then
-                        echo -e "${GREEN}✓ 找到 Python 3.10${NC}"
-                        ln -sf $(which python3.10) /usr/local/bin/python3 2>/dev/null || true
-                    elif command -v python3.9 &> /dev/null; then
-                        echo -e "${GREEN}✓ 找到 Python 3.9${NC}"
-                        ln -sf $(which python3.9) /usr/local/bin/python3 2>/dev/null || true
-                    else
-                        echo -e "${RED}✗ 未找到任何 Python 3 版本${NC}"
-                        echo -e "${YELLOW}请使用 Homebrew 安装:${NC}"
-                        echo -e "${GREEN}brew install python3${NC}"
-                        INSTALL_SUCCESS=false
-                    fi
-                    echo ""
-                    ;;
-                uvx)
-                    echo -e "${YELLOW}[uv] 正在安装...${NC}"
-                    if curl -LsSf https://astral.sh/uv/install.sh | sh; then
-                        # 重新加载环境变量
-                        export PATH="$HOME/.local/bin:$PATH"
-
-                        # 验证安装
-                        if command -v uvx &> /dev/null; then
-                            UVX_VERSION=$(uvx --version 2>&1 | head -1)
-                            echo -e "${GREEN}✓ uv 安装成功: $UVX_VERSION${NC}"
-                        else
-                            echo -e "${YELLOW}⚠ uv 已安装但未在 PATH 中${NC}"
-                            echo -e "${YELLOW}请运行: ${GREEN}source ~/.bashrc${NC} 或 ${GREEN}source ~/.zshrc${NC}"
-                            echo -e "${YELLOW}然后重新运行此脚本${NC}"
-                            INSTALL_SUCCESS=false
-                        fi
-                    else
-                        echo -e "${RED}✗ uv 安装失败${NC}"
-                        INSTALL_SUCCESS=false
-                    fi
-                    echo ""
-                    ;;
-                codex)
-                    echo -e "${YELLOW}[Codex CLI] 正在安装...${NC}"
-
-                    # 检查是否有 npm
-                    if ! command -v npm &> /dev/null; then
-                        echo -e "${RED}✗ 未找到 npm${NC}"
-                        echo -e "${YELLOW}请先安装 Node.js:${NC}"
-                        echo -e "${GREEN}brew install node${NC}"
-                        INSTALL_SUCCESS=false
-                    else
-                        if npm install -g @openai/codex@latest; then
-                            if command -v codex &> /dev/null; then
-                                CODEX_VERSION=$(codex --version 2>&1 | head -1)
-                                echo -e "${GREEN}✓ Codex CLI 安装成功: $CODEX_VERSION${NC}"
-                                NEED_CODEX_LOGIN=true
-                            else
-                                echo -e "${RED}✗ Codex CLI 安装失败${NC}"
-                                INSTALL_SUCCESS=false
-                            fi
-                        else
-                            echo -e "${RED}✗ Codex CLI 安装失败${NC}"
-                            INSTALL_SUCCESS=false
-                        fi
-                    fi
-                    echo ""
-                    ;;
-            esac
-        done
-
-        echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-        if [ "$INSTALL_SUCCESS" = true ]; then
-            echo -e "${GREEN}✅ 所有依赖安装成功！${NC}"
+    if [[ "$DEP_UVX" == false ]]; then
+        if read_yes_no "Install uv now?"; then
             echo ""
-
-            if [ "$NEED_CODEX_LOGIN" = true ]; then
-                echo -e "${YELLOW}⚠️  重要提示：${NC}"
-                echo -e "${YELLOW}请先运行以下命令登录 Codex CLI:${NC}"
-                echo -e "${GREEN}codex login${NC}"
-                echo ""
-                echo -e "${YELLOW}登录完成后，本脚本将继续安装...${NC}"
-                echo ""
-                read -p "按 Enter 键继续..."
+            echo -e "${YELLOW}[uv] Installing...${NC}"
+            if curl -LsSf https://astral.sh/uv/install.sh | sh; then
+                export PATH="$HOME/.local/bin:$PATH"
+                if command_exists uvx; then
+                    DEP_UVX=true
+                    print_success "uv installed: $(uvx --version 2>&1 | head -1)"
+                else
+                    add_error "uv installed but uvx not in PATH; restart terminal and re-run"
+                    add_user_action "Restart terminal to load uvx in PATH"
+                fi
+            else
+                add_error "uv installation failed"
+                add_user_action "Install uv manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
             fi
-
-            echo -e "${BLUE}继续 Plugin 安装流程...${NC}"
-            echo ""
         else
-            echo -e "${RED}❌ 部分依赖安装失败${NC}"
-            echo -e "${YELLOW}请根据上述提示手动安装失败的依赖，然后重新运行此脚本${NC}"
-            exit 1
+            add_user_action "Install uv manually: curl -LsSf https://astral.sh/uv/install.sh | sh"
         fi
-    else
         echo ""
-        echo -e "${RED}安装已取消${NC}"
-        echo -e "${YELLOW}请手动安装以上依赖后重新运行此脚本${NC}"
-        exit 1
+    fi
+
+    if [[ "$DEP_CODEX" == false ]]; then
+        if read_yes_no "Install Codex CLI now?"; then
+            if command_exists npm; then
+                echo ""
+                echo -e "${YELLOW}[Codex CLI] Installing...${NC}"
+                if npm install -g @openai/codex@latest; then
+                    if command_exists codex; then
+                        DEP_CODEX=true
+                        print_success "Codex CLI installed: $(codex --version 2>&1 | head -1)"
+                        add_user_action "Run 'codex login' to authenticate"
+                    else
+                        add_error "Codex CLI installed but not in PATH"
+                        add_user_action "Restart terminal, then run: codex login"
+                    fi
+                else
+                    add_error "Codex CLI installation failed"
+                    add_user_action "Install Codex CLI manually: npm install -g @openai/codex@latest; then run: codex login"
+                fi
+            else
+                add_error "npm not found; cannot install Codex CLI automatically"
+                add_user_action "Install Node.js (https://nodejs.org), then: npm install -g @openai/codex@latest; codex login"
+            fi
+        else
+            add_user_action "Install Codex CLI: npm install -g @openai/codex@latest; then run: codex login"
+        fi
+        echo ""
     fi
 else
-    echo -e "${GREEN}✓ 所有依赖检查通过${NC}"
+    print_success "All dependencies are installed"
     echo ""
 fi
 
-# 获取脚本所在目录
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CLAUDE_DIR="$HOME/.claude"
-PLUGINS_DIR="$CLAUDE_DIR/plugins"
-MCP_SETTINGS="$CLAUDE_DIR/mcp_settings.json"
-
-# 创建必要的目录
-echo -e "${YELLOW}[2/6] 创建目录结构...${NC}"
-mkdir -p "$PLUGINS_DIR"
-echo -e "${GREEN}✓ 目录创建完成${NC}"
+# ── 3. Create directories ──
+echo -e "${YELLOW}[2/5] Creating directories...${NC}"
+if mkdir -p "$PLUGINS_DIR" "$COMMANDS_DIR"; then
+    ACT_DIRS=true
+    print_success "Directories created"
+else
+    add_error "Failed to create directories"
+fi
 echo ""
 
-# 安装 Plugin（符号链接）
-echo -e "${YELLOW}[3/6] 安装 Plugin...${NC}"
+# ── 4. Install plugin ──
+echo -e "${YELLOW}[3/5] Installing plugin...${NC}"
+
 if [ -L "$PLUGINS_DIR/codex-subagents" ]; then
-    echo -e "${YELLOW}  已存在安装，删除旧版本...${NC}"
+    print_warning "Existing plugin symlink found, removing..."
     rm -f "$PLUGINS_DIR/codex-subagents"
 fi
-ln -s "$SCRIPT_DIR" "$PLUGINS_DIR/codex-subagents"
-echo -e "${GREEN}✓ Plugin 已安装到: $PLUGINS_DIR/codex-subagents${NC}"
-echo ""
 
-# 同时复制命令到全局 commands 目录以确保直接可用
-echo -e "${YELLOW}[3.5/5] 安装命令到全局目录...${NC}"
-COMMANDS_DIR="$CLAUDE_DIR/commands"
-mkdir -p "$COMMANDS_DIR"
+if [ -e "$PLUGINS_DIR/codex-subagents" ]; then
+    print_warning "Existing plugin directory found, backing up..."
+    mv "$PLUGINS_DIR/codex-subagents" "$PLUGINS_DIR/codex-subagents.bak.$(date +%Y%m%d%H%M%S)"
+fi
 
-# 复制命令文件
-cp "$SCRIPT_DIR/commands/codex-subagents.md" "$COMMANDS_DIR/"
-cp "$SCRIPT_DIR/commands/codex-subagents-en.md" "$COMMANDS_DIR/"
-echo -e "${GREEN}✓ 命令已复制到: $COMMANDS_DIR${NC}"
-echo ""
-
-# 配置 MCP 服务器
-echo -e "${YELLOW}[4/6] 配置 MCP 服务器...${NC}"
-
-# 读取或创建 mcp_settings.json
-if [ -f "$MCP_SETTINGS" ]; then
-    echo -e "${YELLOW}  已存在 mcp_settings.json，更新配置...${NC}"
-
-    # 使用 node 合并 JSON
-    node -e '
-    const fs = require("fs");
-    const existing = JSON.parse(fs.readFileSync("'"$MCP_SETTINGS"'", "utf8"));
-
-    if (!existing.mcpServers) {
-        existing.mcpServers = {};
-    }
-
-    existing.mcpServers["codex-subagent"] = {
-        "command": "uvx",
-        "args": ["codex-as-mcp@latest"],
-        "transport": "stdio"
-    };
-
-    fs.writeFileSync("'"$MCP_SETTINGS"'", JSON.stringify(existing, null, 2));
-    '
+if ln -s "$SCRIPT_DIR" "$PLUGINS_DIR/codex-subagents" 2>/dev/null; then
+    ACT_PLUGIN=true
+    print_success "Plugin linked to: $PLUGINS_DIR/codex-subagents"
 else
-    echo -e "${YELLOW}  创建新的 mcp_settings.json...${NC}"
-    cat > "$MCP_SETTINGS" << 'EOF'
-{
+    print_warning "Symlink failed, copying files instead..."
+    if cp -R "$SCRIPT_DIR" "$PLUGINS_DIR/codex-subagents"; then
+        ACT_PLUGIN=true
+        print_success "Plugin copied to: $PLUGINS_DIR/codex-subagents"
+    else
+        add_error "Failed to install plugin"
+    fi
+fi
+
+if [[ "$ACT_PLUGIN" == true ]]; then
+    if [ -f "$SCRIPT_DIR/commands/codex-subagents.md" ]; then
+        cp "$SCRIPT_DIR/commands/codex-subagents.md" "$COMMANDS_DIR/" && print_success "Installed: codex-subagents.md"
+    fi
+    if [ -f "$SCRIPT_DIR/commands/codex-subagents-en.md" ]; then
+        cp "$SCRIPT_DIR/commands/codex-subagents-en.md" "$COMMANDS_DIR/" && print_success "Installed: codex-subagents-en.md"
+    fi
+    ACT_COMMANDS=true
+fi
+echo ""
+
+# ── 5. Configure MCP server ──
+echo -e "${YELLOW}[4/5] Configuring MCP server...${NC}"
+
+MCP_CONFIG='{
   "mcpServers": {
     "codex-subagent": {
       "command": "uvx",
@@ -256,57 +301,115 @@ else
       "transport": "stdio"
     }
   }
-}
-EOF
-fi
+}'
 
-echo -e "${GREEN}✓ MCP 服务器配置完成${NC}"
+if [ -f "$MCP_SETTINGS" ]; then
+    print_info "Existing mcp_settings.json found, merging..."
+    if command_exists node; then
+        if node -e "
+        const fs = require('fs');
+        const path = '$MCP_SETTINGS';
+        let existing = {};
+        try {
+            existing = JSON.parse(fs.readFileSync(path, 'utf8'));
+        } catch (e) {
+            console.warn('Could not parse existing mcp_settings.json, using defaults');
+        }
+        if (!existing.mcpServers) existing.mcpServers = {};
+        existing.mcpServers['codex-subagent'] = {
+            command: 'uvx',
+            args: ['codex-as-mcp@latest'],
+            transport: 'stdio'
+        };
+        fs.writeFileSync(path, JSON.stringify(existing, null, 2));
+        "; then
+        ACT_MCP=true
+        print_success "MCP settings updated"
+    else
+        add_error "Failed to merge mcp_settings.json"
+    fi
+    else
+        add_error "node is required to merge mcp_settings.json but was not found"
+        print_info "Please manually add the following to $MCP_SETTINGS:"
+        echo "$MCP_CONFIG"
+    fi
+else
+    if echo "$MCP_CONFIG" > "$MCP_SETTINGS"; then
+        ACT_MCP=true
+        print_success "MCP settings created"
+    else
+        add_error "Failed to create mcp_settings.json"
+    fi
+fi
 echo ""
 
-# 验证安装
-echo -e "${YELLOW}[5/6] 验证安装...${NC}"
+# ── 6. Verification ──
+echo -e "${YELLOW}[5/5] Verifying installation...${NC}"
 
-# 检查 Plugin 结构
 if [ -f "$PLUGINS_DIR/codex-subagents/.claude-plugin/plugin.json" ]; then
-    echo -e "${GREEN}✓ Plugin 结构正确${NC}"
+    print_success "Plugin structure is correct"
 else
-    echo -e "${RED}✗ Plugin 结构异常${NC}"
-    exit 1
+    add_error "Plugin structure is incorrect"
 fi
 
-# 检查命令文件
-if [ -f "$PLUGINS_DIR/codex-subagents/commands/codex-subagents.md" ]; then
-    echo -e "${GREEN}✓ 命令文件存在${NC}"
+if [ -f "$MCP_SETTINGS" ] && grep -q "codex-subagent" "$MCP_SETTINGS"; then
+    print_success "MCP server is configured"
 else
-    echo -e "${RED}✗ 命令文件缺失${NC}"
-    exit 1
-fi
-
-# 检查 MCP 配置
-if grep -q "codex-subagent" "$MCP_SETTINGS"; then
-    echo -e "${GREEN}✓ MCP 服务器已配置${NC}"
-else
-    echo -e "${RED}✗ MCP 配置异常${NC}"
-    exit 1
+    add_error "MCP configuration is missing"
 fi
 
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✅ 安装完成！${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# ── Final report ──
+if [[ "$RESULT_SUCCESS" == true && "$ACT_MCP" == true && ${#USER_ACTIONS[@]} -eq 0 ]]; then
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}  Installation complete!${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+else
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}  Installation finished with notes${NC}"
+    echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+fi
+
 echo ""
-echo -e "${YELLOW}📦 安装位置：${NC}"
-echo -e "   Plugin: $PLUGINS_DIR/codex-subagents"
-echo -e "   MCP配置: $MCP_SETTINGS"
+echo -e "${CYAN}📦 Installation locations:${NC}"
+echo "   Plugin:   $PLUGINS_DIR/codex-subagents"
+echo "   Commands: $COMMANDS_DIR"
+echo "   MCP:      $MCP_SETTINGS"
 echo ""
-echo -e "${YELLOW}🎯 使用方法：${NC}"
-echo -e "   ${GREEN}/codex-subagents${NC} <任务描述>     # 中文版"
-echo -e "   ${GREEN}/codex-subagents-en${NC} <任务描述>  # 英文版"
+
+if [[ ${#USER_ACTIONS[@]} -gt 0 ]]; then
+    echo -e "${YELLOW}⚠️  Required user actions:${NC}"
+    for action in "${USER_ACTIONS[@]}"; do
+        echo "   - $action"
+    done
+    echo ""
+fi
+
+echo -e "${CYAN}🚀 Usage:${NC}"
+echo -e "   /codex-subagents <task>     # Chinese"
+echo -e "   /codex-subagents-en <task>  # English"
 echo ""
-echo -e "${YELLOW}💡 提示：${NC}"
-echo -e "   - MCP 服务器使用 uvx 自动运行 (基于 Python)"
-echo -e "   - 首次使用时会自动下载 codex-as-mcp 依赖"
-echo -e "   - 确保 Codex CLI 已登录: ${GREEN}codex login${NC}"
-echo -e "   - 重启 Claude Code 以加载 Plugin"
+echo -e "${CYAN}⚠️  Important:${NC}"
+echo "   1. Restart Claude Code completely to load the plugin and MCP server."
+echo "   2. Verify with: /mcp"
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# ── Exit codes ──
+# 0 = fully successful
+# 1 = installation failed
+# 2 = installed but user action required
+EXIT_CODE=0
+if [[ "$RESULT_SUCCESS" == false ]]; then
+    EXIT_CODE=1
+elif [[ ${#USER_ACTIONS[@]} -gt 0 ]]; then
+    EXIT_CODE=2
+fi
+
+write_summary "$EXIT_CODE"
+
+if [[ "$AUTO_MODE" == true ]]; then
+    print_info "Agent summary written to: $SUMMARY_FILE"
+fi
+
+exit "$EXIT_CODE"

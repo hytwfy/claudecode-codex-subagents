@@ -1,7 +1,7 @@
 {
   "name": "codex-subagents",
-  "version": "1.0.1",
-  "description": "通过并行委托多个 Codex 代理来编排复杂任务，然后合并和审查结果",
+  "version": "1.0.2",
+  "description": "通过并行委托多个 Codex 代理来编排复杂任务，支持自动安装与无感配置",
   "author": {
     "name": "CoderMageFox"
   },
