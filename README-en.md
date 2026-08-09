@@ -21,127 +21,78 @@ A Claude Code plugin for orchestrating complex tasks by delegating to multiple p
 
 ## Quick Installation
 
-### Method 1: One-Click Install Script (Recommended)
+### Method 1: Run an Installer (Recommended)
 
-**For: First-time users, prefer fully automatic installation**
+Clone the repository, then run the installer for your operating system. It checks dependencies, installs the commands, and configures MCP.
 
 ```bash
-git clone https://github.com/CoderMageFox/claudecode-codex-subagents.git
+git clone https://github.com/<owner>/claudecode-codex-subagents.git
 cd claudecode-codex-subagents
+```
+
+**Windows PowerShell (recommended):**
+
+```powershell
+.\install.ps1
+```
+
+**Windows CMD:**
+
+```cmd
+install.bat
+```
+
+**macOS / Linux / WSL:**
+
+```bash
 ./install.sh
 ```
 
-**Installation script automatically:**
-- ✅ Detects and auto-installs missing dependencies (Python 3, uv, Codex CLI)
-- ✅ Installs Plugin to `~/.claude/plugins/`
-- ✅ **Copies commands to `~/.claude/commands/` for immediate availability**
-- ✅ Configures MCP server (no manual setup needed)
-- ✅ Installs both Chinese and English commands
-- ✅ Verifies installation integrity
+Restart Claude Code completely after installation, then use `/mcp` to confirm that `codex-subagent` is connected.
 
 ### Method 2: Install via Claude Code Plugin System
 
-**For: Familiar with Claude Code plugin system, prefer plugin management**
+Add the marketplace using an HTTPS Git URL to avoid SSH clone failures on networks that block port 22. Replace `<owner>` with the GitHub user or organization that hosts the repository.
 
-#### Step 1: Add Plugin Marketplace
+```text
+/plugin marketplace add https://github.com/<owner>/claudecode-codex-subagents.git
+/plugin install codex-subagents@codex-subagents
+```
 
-Run in Claude Code:
+If `codex-subagent` is not available after installation, configure it from a terminal:
 
 ```bash
-# Method A: Add via GitHub URL
-/plugin marketplace add CoderMageFox/claudecode-codex-subagents
-
-# Method B: Or add in settings.json
+claude mcp add codex-subagent --scope user -- uvx codex-as-mcp@latest
 ```
 
-Add to `~/.claude/settings.json`:
+### Automatic Environment Setup
 
-```json
-{
-  "extraKnownMarketplaces": [
-    {
-      "name": "codex-subagents",
-      "url": "https://github.com/CoderMageFox/claudecode-codex-subagents"
-    }
-  ]
-}
-```
+`AGENT_SETUP.md` defines the automatic setup process. Before performing any environment check, installation, or task orchestration, `/codex-subagents` and `/codex-subagents-en` must read this file in full. If the MCP tool is unavailable, they run the operating-system-specific installer in automatic mode.
 
-#### Step 2: Install Plugin
+### Verify
 
-```bash
-# Install from marketplace
-/plugin install codex-subagents@CoderMageFox
-
-# Or install directly via GitHub path
-/plugin install CoderMageFox/claudecode-codex-subagents
-```
-
-#### Step 3: Configure MCP Server
-
-Manually add to `~/.claude/mcp_settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "codex-subagent": {
-      "command": "uvx",
-      "args": ["codex-as-mcp@latest"],
-      "transport": "stdio"
-    }
-  }
-}
-```
-
-#### Step 4: Restart Claude Code
-
-```bash
-# Exit current session
-exit
-
-# Restart Claude Code
-claude
-```
-
-#### Step 5: Verify Installation
-
-```bash
-# Validate plugin structure
-/plugin validate
-
-# Check MCP server status
+```text
 /mcp
-
-# Test command
-/codex-subagents create test task
+/codex-subagents:codex-subagents create a test task
 ```
 
-### Installation Methods Comparison
-
-| Feature | One-Click Script | Plugin System |
-|---------|-----------------|---------------|
-| Difficulty | ⭐ Easy | ⭐⭐⭐ Medium |
-| Auto Config | ✅ Fully automatic | ❌ Manual MCP config |
-| Dependency Install | ✅ Auto-detect & install | ❌ Manual install |
-| Command Availability | ✅ Immediate | ✅ After restart |
-| Plugin Management | ⚠️ Manual update | ✅ Supports `/plugin update` |
-| Use Case | Quick start | Enterprise team management |
+The command copied by an installer into the user command directory can also be invoked as `/codex-subagents create a test task`.
 
 **Prerequisites:**
-- Python 3 (usually pre-installed on macOS, script will auto-detect)
-- uv (script will prompt and auto-install)
-- Codex CLI >= 0.46.0 (script will prompt and auto-install)
+- Python 3, uv, and the Codex CLI (the installers detect them and, in automatic mode, attempt to install uv and the Codex CLI)
 - Claude Code CLI
 
-> 💡 **Tip**: If dependencies are missing, the installation script will auto-detect and ask if you want to install them. No manual preparation needed!
-
-After installation, restart Claude Code to use.
+> 💡 `codex login` requires user browser/OAuth interaction. The installers report it when needed.
 
 ## Usage
 
 ### Basic Usage
 
-```bash
+```text
+# Plugin installed through a marketplace
+/codex-subagents:codex-subagents <task description>
+
+# Command copied into the user command directory by an installer
 /codex-subagents <task description>
 ```
 

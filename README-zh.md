@@ -21,127 +21,78 @@
 
 ## 快速安装
 
-### 方式 1：一键安装脚本（推荐）
+### 方式 1：运行安装脚本（推荐）
 
-**适合：首次使用，希望全自动安装**
+克隆仓库后，按操作系统运行对应脚本；脚本会检测依赖、安装命令并配置 MCP。
 
 ```bash
-git clone https://github.com/CoderMageFox/claudecode-codex-subagents.git
+git clone https://github.com/<owner>/claudecode-codex-subagents.git
 cd claudecode-codex-subagents
+```
+
+**Windows PowerShell（推荐）：**
+
+```powershell
+.\install.ps1
+```
+
+**Windows CMD：**
+
+```cmd
+install.bat
+```
+
+**macOS / Linux / WSL：**
+
+```bash
 ./install.sh
 ```
 
-**安装脚本会自动完成：**
-- ✅ 检测并自动安装缺失的依赖（Python 3, uv, Codex CLI）
-- ✅ 安装 Plugin 到 `~/.claude/plugins/`
-- ✅ **复制命令到 `~/.claude/commands/` 以确保直接可用**
-- ✅ 配置 MCP 服务器（无需手动安装）
-- ✅ 自动安装中英文双版本命令
-- ✅ 验证安装完整性
+安装后完全重启 Claude Code，并通过 `/mcp` 确认 `codex-subagent` 已连接。
 
 ### 方式 2：通过 Claude Code Plugin 系统安装
 
-**适合：熟悉 Claude Code plugin 系统，希望使用 plugin 管理**
+使用 HTTPS Git URL 添加 marketplace，避免在端口 22 受限的网络中触发 SSH 克隆失败。将 `<owner>` 替换为实际 GitHub 用户或组织名。
 
-#### 步骤 1：添加 Plugin Marketplace
+```text
+/plugin marketplace add https://github.com/<owner>/claudecode-codex-subagents.git
+/plugin install codex-subagents@codex-subagents
+```
 
-在 Claude Code 中运行：
+若安装后还没有 `codex-subagent` MCP server，请在终端执行：
 
 ```bash
-# 方式 A: 通过 GitHub URL 添加
-/plugin marketplace add CoderMageFox/claudecode-codex-subagents
-
-# 方式 B: 或者在 settings.json 中添加
+claude mcp add codex-subagent --scope user -- uvx codex-as-mcp@latest
 ```
 
-在 `~/.claude/settings.json` 中添加：
+### 自动环境设置
 
-```json
-{
-  "extraKnownMarketplaces": [
-    {
-      "name": "codex-subagents",
-      "url": "https://github.com/CoderMageFox/claudecode-codex-subagents"
-    }
-  ]
-}
-```
+`AGENT_SETUP.md` 定义了自动环境设置流程。`/codex-subagents` 和 `/codex-subagents-en` 在执行环境检测、安装或任务编排前，都必须先完整阅读该文件；MCP 工具不可用时，会按操作系统以自动模式运行相应安装器。
 
-#### 步骤 2：安装 Plugin
+### 验证
 
-```bash
-# 从 marketplace 安装
-/plugin install codex-subagents@CoderMageFox
-
-# 或者直接通过 GitHub 路径安装
-/plugin install CoderMageFox/claudecode-codex-subagents
-```
-
-#### 步骤 3：配置 MCP 服务器
-
-手动在 `~/.claude/mcp_settings.json` 中添加：
-
-```json
-{
-  "mcpServers": {
-    "codex-subagent": {
-      "command": "uvx",
-      "args": ["codex-as-mcp@latest"],
-      "transport": "stdio"
-    }
-  }
-}
-```
-
-#### 步骤 4：重启 Claude Code
-
-```bash
-# 退出当前会话
-exit
-
-# 重新启动 Claude Code
-claude
-```
-
-#### 步骤 5：验证安装
-
-```bash
-# 验证 plugin 结构
-/plugin validate
-
-# 检查 MCP 服务器状态
+```text
 /mcp
-
-# 测试命令
-/codex-subagents 测试任务
+/codex-subagents:codex-subagents 测试任务
 ```
 
-### 方式对比
-
-| 特性 | 一键安装脚本 | Plugin 系统安装 |
-|------|------------|----------------|
-| 安装难度 | ⭐ 简单 | ⭐⭐⭐ 中等 |
-| 自动配置 | ✅ 全自动 | ❌ 需手动配置 MCP |
-| 依赖安装 | ✅ 自动检测安装 | ❌ 需手动安装 |
-| 命令可用性 | ✅ 立即可用 | ✅ 重启后可用 |
-| Plugin 管理 | ⚠️ 手动更新 | ✅ 支持 `/plugin update` |
-| 适用场景 | 快速开始 | 企业团队管理 |
+通过安装脚本复制到用户命令目录的版本，也可使用 `/codex-subagents 测试任务`。
 
 **前置要求：**
-- Python 3 (macOS 通常自带，脚本会自动检测)
-- uv (脚本会提示并自动安装)
-- Codex CLI >= 0.46.0 (脚本会提示并自动安装)
+- Python 3、uv 和 Codex CLI（安装器会检测，并在自动模式下尝试安装 `uv` 与 Codex CLI）
 - Claude Code CLI
 
-> 💡 **提示**: 如果缺少依赖，安装脚本会自动检测并询问是否安装，无需手动准备！
-
-安装完成后，重启 Claude Code 即可使用。
+> 💡 `codex login` 需要用户在浏览器中完成认证；安装器会在需要时提示该操作。
 
 ## 使用方法
 
 ### 基本用法
 
-```bash
+```text
+# 通过 marketplace 安装的插件
+/codex-subagents:codex-subagents <任务描述>
+
+# 通过安装脚本复制到用户命令目录的命令
 /codex-subagents <任务描述>
 ```
 

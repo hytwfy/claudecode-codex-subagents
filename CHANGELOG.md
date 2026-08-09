@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Cross-platform setup assets: PowerShell, CMD, and shell installers plus `AGENT_SETUP.md`.
+- A Claude Code marketplace manifest for standard marketplace installation.
+
+### Changed
+- Updated Chinese and English installation instructions for HTTPS marketplace URLs, platform-specific installers, automatic setup, and namespaced plugin commands.
+
 ## [2.0.0] - 2025-11-07
 
 ### Changed (Breaking)
