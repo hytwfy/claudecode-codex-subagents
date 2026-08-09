@@ -26,7 +26,7 @@
 克隆仓库后，按操作系统运行对应脚本；脚本会检测依赖、安装命令并配置 MCP。
 
 ```bash
-git clone https://github.com/<owner>/claudecode-codex-subagents.git
+git clone https://github.com/hytwfy/claudecode-codex-subagents.git
 cd claudecode-codex-subagents
 ```
 
@@ -52,10 +52,10 @@ install.bat
 
 ### 方式 2：通过 Claude Code Plugin 系统安装
 
-使用 HTTPS Git URL 添加 marketplace，避免在端口 22 受限的网络中触发 SSH 克隆失败。将 `<owner>` 替换为实际 GitHub 用户或组织名。
+使用 HTTPS Git URL 添加 marketplace，避免在端口 22 受限的网络中触发 SSH 克隆失败。
 
 ```text
-/plugin marketplace add https://github.com/<owner>/claudecode-codex-subagents.git
+/plugin marketplace add https://github.com/hytwfy/claudecode-codex-subagents.git
 /plugin install codex-subagents@codex-subagents
 ```
 

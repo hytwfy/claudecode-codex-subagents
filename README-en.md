@@ -26,7 +26,7 @@ A Claude Code plugin for orchestrating complex tasks by delegating to multiple p
 Clone the repository, then run the installer for your operating system. It checks dependencies, installs the commands, and configures MCP.
 
 ```bash
-git clone https://github.com/<owner>/claudecode-codex-subagents.git
+git clone https://github.com/hytwfy/claudecode-codex-subagents.git
 cd claudecode-codex-subagents
 ```
 
@@ -52,10 +52,10 @@ Restart Claude Code completely after installation, then use `/mcp` to confirm th
 
 ### Method 2: Install via Claude Code Plugin System
 
-Add the marketplace using an HTTPS Git URL to avoid SSH clone failures on networks that block port 22. Replace `<owner>` with the GitHub user or organization that hosts the repository.
+Add the marketplace using an HTTPS Git URL to avoid SSH clone failures on networks that block port 22.
 
 ```text
-/plugin marketplace add https://github.com/<owner>/claudecode-codex-subagents.git
+/plugin marketplace add https://github.com/hytwfy/claudecode-codex-subagents.git
 /plugin install codex-subagents@codex-subagents
 ```
 
