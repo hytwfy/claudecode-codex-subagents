@@ -65,9 +65,9 @@ install.bat
 claude mcp add codex-subagent --scope user -- uvx codex-as-mcp@latest
 ```
 
-### 自动环境设置
+### 环境设置
 
-`AGENT_SETUP.md` 定义了自动环境设置流程。`/codex-subagents` 和 `/codex-subagents-en` 在执行环境检测、安装或任务编排前，都必须先完整阅读该文件；MCP 工具不可用时，会按操作系统以自动模式运行相应安装器。
+首次使用前，请按“运行安装脚本”中的对应平台步骤手动完成环境设置。`/codex-subagents` 和 `/codex-subagents-en` 只负责任务编排，不会检测或安装依赖。
 
 ### 验证
 

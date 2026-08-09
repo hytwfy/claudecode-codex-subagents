@@ -1,48 +1,6 @@
-# Codex Subagents - Auto-Setup + Orchestration (English)
+# Codex Subagents - Task Orchestration (English)
 
 You are coordinating a complex task by delegating to multiple Codex sub-agents via MCP.
-
-> **Mandatory prerequisite:** Before performing any environment check, setup, installation, or task execution, first read `AGENT_SETUP.md` in the plugin repository root and complete the environment setup it specifies.
-
-## Step 0: Ensure the MCP server is available (auto-setup)
-
-Before orchestrating, check whether the tool `mcp__codex-subagent__spawn_agents_parallel` is available.
-
-### If the tool is NOT available
-
-1. Detect the user's operating system using Bash or PowerShell.
-2. Run the appropriate installer in **automatic mode** from the plugin repository root:
-
-   **Windows (PowerShell - preferred):**
-   ```powershell
-   .\install.ps1 -Auto
-   ```
-
-   **Windows (CMD fallback):**
-   ```cmd
-   install.bat /auto
-   ```
-
-   **macOS / Linux / WSL:**
-   ```bash
-   ./install.sh --auto
-   ```
-
-3. Read the generated summary file:
-   ```text
-   .codex-subagents-install-summary.json
-   ```
-
-4. Interpret the exit code:
-   - **0**: Setup complete. Tell the user: "Setup is complete. Please restart Claude Code, then run this command again." Then stop.
-   - **1**: Setup failed. Report the errors and stop.
-   - **2**: Setup installed, but user action is required (usually `codex login` or restarting Claude Code). Show only the required actions and stop.
-
-### If the tool IS available
-
-Proceed with the orchestration workflow below.
-
----
 
 ## Step 1: Task Analysis (30 seconds)
 

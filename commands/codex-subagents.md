@@ -1,48 +1,6 @@
-# Codex Subagents - 自动安装 + 任务编排（中文版）
+# Codex Subagents - 任务编排（中文版）
 
 你正在通过 MCP 将复杂任务并行委托给多个 Codex 子代理，并协调它们的执行。
-
-> **强制前置条件：** 在进行任何环境检测、环境设置、安装或任务执行前，必须先完整阅读插件仓库根目录的 `AGENT_SETUP.md`，并按其中说明完成环境设置。
-
-## 第 0 步：确保 MCP server 可用（自动安装）
-
-在编排任务之前，先检查工具 `mcp__codex-subagent__spawn_agents_parallel` 是否可用。
-
-### 如果该工具不可用
-
-1. 使用 Bash 或 PowerShell 检测用户的操作系统。
-2. 从插件仓库根目录运行对应安装脚本的**自动模式**：
-
-   **Windows（推荐 PowerShell）：**
-   ```powershell
-   .\install.ps1 -Auto
-   ```
-
-   **Windows（旧版 CMD 备用）：**
-   ```cmd
-   install.bat /auto
-   ```
-
-   **macOS / Linux / WSL：**
-   ```bash
-   ./install.sh --auto
-   ```
-
-3. 读取生成的汇总文件：
-   ```text
-   .codex-subagents-install-summary.json
-   ```
-
-4. 根据退出码处理结果：
-   - **0**：安装完成。告诉用户：「安装已完成，请完全重启 Claude Code 后再次运行此命令。」然后停止。
-   - **1**：安装失败。报告错误并停止。
-   - **2**：已安装，但需要用户手动操作（通常是 `codex login` 或重启 Claude Code）。只列出需要用户做的事，然后停止。
-
-### 如果该工具可用
-
-继续执行下面的编排流程。
-
----
 
 ## 第 1 步：任务分析（30 秒）
 

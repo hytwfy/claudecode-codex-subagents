@@ -65,9 +65,9 @@ If `codex-subagent` is not available after installation, configure it from a ter
 claude mcp add codex-subagent --scope user -- uvx codex-as-mcp@latest
 ```
 
-### Automatic Environment Setup
+### Environment Setup
 
-`AGENT_SETUP.md` defines the automatic setup process. Before performing any environment check, installation, or task orchestration, `/codex-subagents` and `/codex-subagents-en` must read this file in full. If the MCP tool is unavailable, they run the operating-system-specific installer in automatic mode.
+Before first use, complete the platform-specific manual setup steps in “Run an Installer.” `/codex-subagents` and `/codex-subagents-en` orchestrate tasks only; they do not detect or install dependencies.
 
 ### Verify
 
