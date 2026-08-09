@@ -135,7 +135,7 @@ if "%DEP_UVX%"=="false" (
 if "%DEP_CODEX%"=="false" (
     if "%AUTO_MODE%"=="true" (
         echo [codex] Auto-installing Codex CLI...
-        npm install -g @openai/codex@latest
+        powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
         if %errorlevel% == 0 (
             codex --version > nul 2>&1
             if %errorlevel% == 0 (
@@ -148,13 +148,13 @@ if "%DEP_CODEX%"=="false" (
             )
         ) else (
             call :add_error "Codex CLI installation failed"
-            call :add_user_action "Install Codex CLI manually: npm install -g @openai/codex@latest; then run: codex login"
+            call :add_user_action "Install Codex CLI manually: powershell -ExecutionPolicy ByPass -c 'irm https://chatgpt.com/codex/install.ps1 | iex'; then run: codex login"
         )
     ) else (
         echo [codex] Install with:
-        echo   npm install -g @openai/codex@latest
+        echo   powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 ^| iex"
         echo   Then login: codex login
-        call :add_user_action "Install Codex CLI: npm install -g @openai/codex@latest; then run: codex login"
+        call :add_user_action "Install Codex CLI: powershell -ExecutionPolicy ByPass -c 'irm https://chatgpt.com/codex/install.ps1 | iex'; then run: codex login"
     )
     echo.
 )

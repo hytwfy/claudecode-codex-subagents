@@ -185,31 +185,26 @@ if ($Result.dependencies.Values -contains $false) {
     if (-not $Result.dependencies.codex) {
         if ($SkipDependencyInstall) {
             Write-WarningMsg "codex missing, but -SkipDependencyInstall is set"
-            Add-UserAction "Install Codex CLI: npm install -g @openai/codex@latest; then run: codex login"
+            Add-UserAction 'Install Codex CLI: powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"; then run: codex login'
         } else {
             if ($Auto -or (Read-YesNoAuto "Install Codex CLI now?")) {
-                if (Test-CommandAvailable "npm") {
-                    Write-Host "[Codex CLI] Installing..." -ForegroundColor Yellow
-                    try {
-                        npm install -g @openai/codex@latest
-                        if (Test-CommandAvailable "codex") {
-                            $Result.dependencies.codex = $true
-                            Write-Success "Codex CLI installed: $(Get-CommandVersionSafe codex)"
-                            Add-UserAction "Run 'codex login' to authenticate"
-                        } else {
-                            Add-Error "Codex CLI installed but not in PATH"
-                            Add-UserAction "Restart terminal, then run: codex login"
-                        }
-                    } catch {
-                        Add-Error "Codex CLI installation failed: $_"
-                        Add-UserAction "Install Codex CLI manually: npm install -g @openai/codex@latest; then run: codex login"
+                Write-Host "[Codex CLI] Installing..." -ForegroundColor Yellow
+                try {
+                    powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
+                    if (Test-CommandAvailable "codex") {
+                        $Result.dependencies.codex = $true
+                        Write-Success "Codex CLI installed: $(Get-CommandVersionSafe codex)"
+                        Add-UserAction "Run 'codex login' to authenticate"
+                    } else {
+                        Add-Error "Codex CLI installed but not in PATH"
+                        Add-UserAction "Restart terminal, then run: codex login"
                     }
-                } else {
-                    Add-Error "npm not found; cannot install Codex CLI automatically"
-                    Add-UserAction "Install Node.js (https://nodejs.org), then: npm install -g @openai/codex@latest; codex login"
+                } catch {
+                    Add-Error "Codex CLI installation failed: $_"
+                    Add-UserAction 'Install Codex CLI manually: powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"; then run: codex login'
                 }
             } else {
-                Add-UserAction "Install Codex CLI: npm install -g @openai/codex@latest; then run: codex login"
+                Add-UserAction 'Install Codex CLI: powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"; then run: codex login'
             }
         }
     }

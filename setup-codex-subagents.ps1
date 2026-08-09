@@ -99,7 +99,7 @@ if (Test-CommandAvailable "codex") {
 } else {
     Write-Host "  ✗ codex 未安装" -ForegroundColor Red
     Write-Host "  📦 请手动安装 Codex CLI:" -ForegroundColor Yellow
-    Write-Host "    npm install -g @openai/codex@latest" -ForegroundColor DarkGray
+    Write-Host '    powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"' -ForegroundColor DarkGray
     Write-Host "  🔑 安装后登录:" -ForegroundColor Yellow
     Write-Host "    codex login" -ForegroundColor DarkGray
 }
@@ -155,7 +155,7 @@ Write-Host "1. 确保 uvx 已安装（如果刚才安装了 uv，请重启终端
 Write-Host "   验证命令: uvx --version" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "2. 安装并登录 Codex CLI:" -ForegroundColor White
-Write-Host "   npm install -g @openai/codex@latest" -ForegroundColor DarkGray
+Write-Host '   powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"' -ForegroundColor DarkGray
 Write-Host "   codex login" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "3. 完全退出当前 Claude Code 会话，然后重新启动" -ForegroundColor White
