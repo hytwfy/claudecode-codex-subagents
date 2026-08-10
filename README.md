@@ -55,7 +55,7 @@ install.bat
 安装器会先清理 `local`、`project` 和 `user` 三个 scope 中已有的 `codex-subagent`，再注册用户级 MCP server：
 
 ```bash
-claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest
+claude mcp add codex-subagent --scope user -- uvx --with fastmcp codex-as-mcp@latest
 ```
 
 该方式写入 Claude Code 的用户配置（`~/.claude.json`），不会写入已不被读取的 `~/.claude/mcp_settings.json`。`--with fastmcp` 是必需依赖；缺少它时，`codex-as-mcp` 会报 `No module named 'mcp.server.fastmcp'`。
@@ -74,7 +74,7 @@ claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@la
 若安装后还没有 `codex-subagent` MCP server，请在终端执行：
 
 ```bash
-claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest
+claude mcp add codex-subagent --scope user -- uvx --with fastmcp codex-as-mcp@latest
 ```
 
 ### 环境设置

@@ -286,7 +286,7 @@ if (Test-CommandAvailable "claude") {
         $null = & claude mcp remove codex-subagent -s local 2>&1
         $null = & claude mcp remove codex-subagent -s project 2>&1
         $null = & claude mcp remove codex-subagent -s user 2>&1
-        $addOutput = & claude mcp add --scope user codex-subagent -- uvx @mcpServerArgs 2>&1
+        $addOutput = & claude mcp add codex-subagent --scope user -- uvx @mcpServerArgs 2>&1
         $addExitCode = $LASTEXITCODE
         $ErrorActionPreference = $previousErrorActionPreference
 

@@ -309,7 +309,7 @@ if command_exists claude; then
     claude mcp remove codex-subagent -s local >/dev/null 2>&1 || true
     claude mcp remove codex-subagent -s project >/dev/null 2>&1 || true
     claude mcp remove codex-subagent -s user >/dev/null 2>&1 || true
-    if claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest >/dev/null 2>&1; then
+    if claude mcp add codex-subagent --scope user -- uvx --with fastmcp codex-as-mcp@latest >/dev/null 2>&1; then
         registered=true
         ACT_MCP=true
         print_success "MCP server registered with Claude Code"
