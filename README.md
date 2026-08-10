@@ -50,6 +50,18 @@ install.bat
 
 安装后完全重启 Claude Code，并通过 `/mcp` 确认 `codex-subagent` 已连接。
 
+#### MCP 注册行为
+
+安装器会先清理 `local`、`project` 和 `user` 三个 scope 中已有的 `codex-subagent`，再注册用户级 MCP server：
+
+```bash
+claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest
+```
+
+该方式写入 Claude Code 的用户配置（`~/.claude.json`），不会写入已不被读取的 `~/.claude/mcp_settings.json`。`--with fastmcp` 是必需依赖；缺少它时，`codex-as-mcp` 会报 `No module named 'mcp.server.fastmcp'`。
+
+如果找不到 Claude CLI 或注册失败，安装器会在插件目录写入 `.mcp.json` 作为回退配置；重启 Claude Code 后，按界面提示批准 `codex-subagent`。
+
 ### 方式 2：通过 Claude Code Plugin 系统安装
 
 使用 HTTPS Git URL 添加 marketplace，避免在端口 22 受限的网络中触发 SSH 克隆失败。
@@ -62,7 +74,7 @@ install.bat
 若安装后还没有 `codex-subagent` MCP server，请在终端执行：
 
 ```bash
-claude mcp add codex-subagent --scope user -- uvx codex-as-mcp@latest
+claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest
 ```
 
 ### 环境设置

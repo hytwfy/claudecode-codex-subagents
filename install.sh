@@ -25,7 +25,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLAUDE_DIR="${HOME}/.claude"
 PLUGINS_DIR="${CLAUDE_DIR}/plugins"
 COMMANDS_DIR="${CLAUDE_DIR}/commands"
-MCP_SETTINGS="${CLAUDE_DIR}/mcp_settings.json"
+MCP_JSON="${SCRIPT_DIR}/.mcp.json"
 SUMMARY_FILE="${SCRIPT_DIR}/.codex-subagents-install-summary.json"
 
 # ── Result tracking ──
@@ -293,53 +293,45 @@ echo ""
 # ── 5. Configure MCP server ──
 echo -e "${YELLOW}[4/5] Configuring MCP server...${NC}"
 
-MCP_CONFIG='{
+MCP_SERVER_ARGS='"--with", "fastmcp", "codex-as-mcp@latest"'
+MCP_JSON_CONFIG='{
   "mcpServers": {
     "codex-subagent": {
       "command": "uvx",
-      "args": ["codex-as-mcp@latest"],
-      "transport": "stdio"
+      "args": [--ARGS--]
     }
   }
 }'
+MCP_JSON_CONFIG="${MCP_JSON_CONFIG/--ARGS--/$MCP_SERVER_ARGS}"
 
-if [ -f "$MCP_SETTINGS" ]; then
-    print_info "Existing mcp_settings.json found, merging..."
-    if command_exists node; then
-        if node -e "
-        const fs = require('fs');
-        const path = '$MCP_SETTINGS';
-        let existing = {};
-        try {
-            existing = JSON.parse(fs.readFileSync(path, 'utf8'));
-        } catch (e) {
-            console.warn('Could not parse existing mcp_settings.json, using defaults');
-        }
-        if (!existing.mcpServers) existing.mcpServers = {};
-        existing.mcpServers['codex-subagent'] = {
-            command: 'uvx',
-            args: ['codex-as-mcp@latest'],
-            transport: 'stdio'
-        };
-        fs.writeFileSync(path, JSON.stringify(existing, null, 2));
-        "; then
+registered=false
+if command_exists claude; then
+    claude mcp remove codex-subagent -s local >/dev/null 2>&1 || true
+    claude mcp remove codex-subagent -s project >/dev/null 2>&1 || true
+    claude mcp remove codex-subagent -s user >/dev/null 2>&1 || true
+    if claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest >/dev/null 2>&1; then
+        registered=true
         ACT_MCP=true
-        print_success "MCP settings updated"
+        print_success "MCP server registered with Claude Code"
+        if [ -f "$MCP_JSON" ]; then
+            rm -f "$MCP_JSON"
+            print_info "Removed project-scoped .mcp.json to avoid duplicate server name"
+        fi
     else
-        add_error "Failed to merge mcp_settings.json"
-    fi
-    else
-        add_error "node is required to merge mcp_settings.json but was not found"
-        print_info "Please manually add the following to $MCP_SETTINGS:"
-        echo "$MCP_CONFIG"
+        print_warning "claude mcp add failed; will use .mcp.json fallback"
     fi
 else
-    if echo "$MCP_CONFIG" > "$MCP_SETTINGS"; then
+    print_warning "claude CLI not found in PATH; will use .mcp.json fallback"
+fi
+
+if [[ "$registered" == false ]]; then
+    if echo "$MCP_JSON_CONFIG" > "$MCP_JSON"; then
         ACT_MCP=true
-        print_success "MCP settings created"
+        print_success "Plugin .mcp.json written to: $MCP_JSON"
     else
-        add_error "Failed to create mcp_settings.json"
+        add_error "Failed to write .mcp.json"
     fi
+    print_info "Please restart Claude Code and approve the 'codex-subagent' MCP server from .mcp.json"
 fi
 echo ""
 
@@ -352,10 +344,16 @@ else
     add_error "Plugin structure is incorrect"
 fi
 
-if [ -f "$MCP_SETTINGS" ] && grep -q "codex-subagent" "$MCP_SETTINGS"; then
-    print_success "MCP server is configured"
+if [ -f "$MCP_JSON" ] && grep -q "codex-subagent" "$MCP_JSON"; then
+    print_success "MCP server is configured in .mcp.json"
+elif [[ "$registered" == true ]]; then
+    print_success "MCP server is configured via Claude Code user config"
 else
-    add_error "MCP configuration is missing"
+    add_error "MCP configuration is missing in .mcp.json"
+fi
+
+if [[ "$registered" == true ]]; then
+    print_success "MCP server registered with Claude Code (active after restart)"
 fi
 
 echo ""
@@ -375,7 +373,7 @@ echo ""
 echo -e "${CYAN}📦 Installation locations:${NC}"
 echo "   Plugin:   $PLUGINS_DIR/codex-subagents"
 echo "   Commands: $COMMANDS_DIR"
-echo "   MCP:      $MCP_SETTINGS"
+echo "   MCP:      $MCP_JSON"
 echo ""
 
 if [[ ${#USER_ACTIONS[@]} -gt 0 ]]; then

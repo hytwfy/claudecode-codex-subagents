@@ -50,6 +50,18 @@ install.bat
 
 Restart Claude Code completely after installation, then use `/mcp` to confirm that `codex-subagent` is connected.
 
+#### MCP registration behavior
+
+The installer first removes stale `codex-subagent` entries from the `local`, `project`, and `user` scopes, then registers the server in the user scope:
+
+```bash
+claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest
+```
+
+This writes to Claude Code's user configuration (`~/.claude.json`), rather than the unsupported `~/.claude/mcp_settings.json`. The `--with fastmcp` dependency is required; without it, `codex-as-mcp` fails with `No module named 'mcp.server.fastmcp'`.
+
+If the Claude CLI is unavailable or registration fails, the installer writes a `.mcp.json` fallback in the plugin directory. Restart Claude Code and approve `codex-subagent` when prompted.
+
 ### Method 2: Install via Claude Code Plugin System
 
 Add the marketplace using an HTTPS Git URL to avoid SSH clone failures on networks that block port 22.
@@ -62,7 +74,7 @@ Add the marketplace using an HTTPS Git URL to avoid SSH clone failures on networ
 If `codex-subagent` is not available after installation, configure it from a terminal:
 
 ```bash
-claude mcp add codex-subagent --scope user -- uvx codex-as-mcp@latest
+claude mcp add --scope user codex-subagent -- uvx --with fastmcp codex-as-mcp@latest
 ```
 
 ### Environment Setup

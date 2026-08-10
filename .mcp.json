@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codex-subagent": {
+      "command": "uvx",
+      "args": ["--with", "fastmcp", "codex-as-mcp@latest"]
+    }
+  }
+}

@@ -9,8 +9,9 @@
     该脚本会：
     1. 检查 python3、uvx、codex 是否已安装
     2. 可选自动安装 uv（提供 uvx）
-    3. 创建 ~/.claude/mcp_settings.json
-    4. 提示你如何安装 Codex CLI 并重启 Claude Code
+    3. 优先通过 claude mcp add 注册 MCP server
+    4. 注册失败时创建插件目录下的 .mcp.json
+    5. 提示你如何安装 Codex CLI 并重启 Claude Code
 
 .NOTES
     请以普通用户权限运行，不需要管理员权限。
@@ -20,14 +21,8 @@
 $ErrorActionPreference = "Stop"
 
 # ── 路径配置 ──
-$ClaudeDir = Join-Path $env:USERPROFILE ".claude"
-$McpSettingsPath = Join-Path $ClaudeDir "mcp_settings.json"
-
-# 确保 .claude 目录存在
-if (-not (Test-Path $ClaudeDir)) {
-    New-Item -ItemType Directory -Path $ClaudeDir -Force | Out-Null
-    Write-Host "✓ 创建目录: $ClaudeDir" -ForegroundColor Green
-}
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$McpJsonPath = Join-Path $ScriptDir ".mcp.json"
 
 # ── 辅助函数 ──
 function Test-CommandAvailable {
@@ -58,7 +53,7 @@ if (Test-CommandAvailable "python3") {
     Write-Host "  ✓ python3 已安装: $(Get-CommandVersion python3)" -ForegroundColor Green
 } elseif (Test-CommandAvailable "python") {
     Write-Host "  ✓ python 已安装: $(Get-CommandVersion python)" -ForegroundColor Green
-    Write-Host "  ⚠ 建议使用 python3 命令，或在 mcp_settings.json 中指定完整路径" -ForegroundColor Yellow
+    Write-Host "  ⚠ 建议使用 python3 命令，或确保 python 已加入 PATH" -ForegroundColor Yellow
 } else {
     Write-Host "  ✗ 未找到 python3/python" -ForegroundColor Red
     Write-Host "  📦 请从 Microsoft Store 或 https://www.python.org 安装 Python 3" -ForegroundColor Yellow
@@ -105,46 +100,68 @@ if (Test-CommandAvailable "codex") {
 }
 Write-Host ""
 
-# ── 4. 创建/更新 mcp_settings.json ──
+# ── 4. 注册到 Claude Code 或创建 .mcp.json fallback ──
 Write-Host "[4/4] 配置 MCP server..." -ForegroundColor Yellow
 
-$mcpConfig = @{
-    mcpServers = @{
-        "codex-subagent" = @{
-            command = "uvx"
-            args = @("codex-as-mcp@latest")
-            transport = "stdio"
+$mcpServerArgs = @("--with", "fastmcp", "codex-as-mcp@latest")
+$registered = $false
+if (Test-CommandAvailable "claude") {
+    try {
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $null = & claude mcp remove codex-subagent -s local 2>&1
+        $null = & claude mcp remove codex-subagent -s project 2>&1
+        $null = & claude mcp remove codex-subagent -s user 2>&1
+        $addOutput = & claude mcp add --scope user codex-subagent -- uvx @mcpServerArgs 2>&1
+        $addExitCode = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorActionPreference
+
+        if ($addExitCode -eq 0) {
+            $registered = $true
+            Write-Host "  ✓ 已通过 claude mcp add 注册" -ForegroundColor Green
+            if (Test-Path $McpJsonPath) {
+                Remove-Item -Path $McpJsonPath -Force
+                Write-Host "  ℹ 已删除项目级 .mcp.json，避免同名 server 冲突" -ForegroundColor Cyan
+            }
+        } else {
+            Write-Host "  ⚠ claude mcp add 返回错误，将使用 .mcp.json fallback" -ForegroundColor Yellow
+            if ($addOutput) { Write-Host "    $addOutput" -ForegroundColor DarkGray }
+        }
+    } catch {
+        $ErrorActionPreference = $previousErrorActionPreference
+        Write-Host "  ⚠ 无法运行 claude mcp add，将使用 .mcp.json fallback" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  ⚠ 未找到 claude CLI，将使用 .mcp.json fallback" -ForegroundColor Yellow
+}
+
+if (-not $registered) {
+    $mcpConfig = @{
+        mcpServers = @{
+            "codex-subagent" = @{
+                command = "uvx"
+                args = $mcpServerArgs
+            }
         }
     }
-}
-
-$existingConfig = $null
-if (Test-Path $McpSettingsPath) {
     try {
-        $existingConfig = Get-Content $McpSettingsPath -Raw | ConvertFrom-Json
-        Write-Host "  已存在 mcp_settings.json，将合并配置..." -ForegroundColor Yellow
+        $mcpConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $McpJsonPath -Encoding UTF8
+        Write-Host "  ✓ 已写入: $McpJsonPath" -ForegroundColor Green
+        Write-Host "  💡 重启 Claude Code 后需要手动批准 codex-subagent MCP server" -ForegroundColor Cyan
     } catch {
-        Write-Host "  ⚠ 现有 mcp_settings.json 解析失败，将覆盖" -ForegroundColor Yellow
+        Write-Host "  ✗ 写入 .mcp.json 失败: $_" -ForegroundColor Red
     }
 }
-
-if ($existingConfig -and $existingConfig.mcpServers) {
-    $existingConfig.mcpServers | Add-Member -NotePropertyName "codex-subagent" -NotePropertyValue $mcpConfig.mcpServers["codex-subagent"] -Force
-    $finalConfig = $existingConfig
-} else {
-    $finalConfig = $mcpConfig
-}
-
-$finalConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $McpSettingsPath -Encoding UTF8
-Write-Host "  ✓ 已写入: $McpSettingsPath" -ForegroundColor Green
 Write-Host ""
 
 # ── 显示最终配置 ──
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-Write-Host "  当前 MCP 配置:" -ForegroundColor Cyan
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-Get-Content $McpSettingsPath | Write-Host
-Write-Host ""
+if (Test-Path $McpJsonPath) {
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+    Write-Host "  当前 .mcp.json 配置:" -ForegroundColor Cyan
+    Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+    Get-Content $McpJsonPath | Write-Host
+    Write-Host ""
+}
 
 # ── 后续步骤 ──
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan

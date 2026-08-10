@@ -39,7 +39,7 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $ClaudeDir = Join-Path $env:USERPROFILE ".claude"
 $PluginsDir = Join-Path $ClaudeDir "plugins"
 $CommandsDir = Join-Path $ClaudeDir "commands"
-$McpSettingsPath = Join-Path $ClaudeDir "mcp_settings.json"
+$McpJsonPath = Join-Path $ScriptDir ".mcp.json"
 
 # ── Result tracking ──
 $Result = [ordered]@{
@@ -273,39 +273,66 @@ Write-Host ""
 # ── 5. Configure MCP server ──
 Write-Host "[4/5] Configuring MCP server..." -ForegroundColor Yellow
 
-$mcpConfig = @{
-    mcpServers = @{
-        "codex-subagent" = @{
-            command = "uvx"
-            args = @("codex-as-mcp@latest")
-            transport = "stdio"
+$mcpServerArgs = @("--with", "fastmcp", "codex-as-mcp@latest")
+$registered = $false
+
+# Register with Claude Code first so the MCP server is user-scoped and active after restart.
+if (Test-CommandAvailable "claude") {
+    try {
+        $previousErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+
+        # Remove stale entries from every scope before adding the user-scoped server.
+        $null = & claude mcp remove codex-subagent -s local 2>&1
+        $null = & claude mcp remove codex-subagent -s project 2>&1
+        $null = & claude mcp remove codex-subagent -s user 2>&1
+        $addOutput = & claude mcp add --scope user codex-subagent -- uvx @mcpServerArgs 2>&1
+        $addExitCode = $LASTEXITCODE
+        $ErrorActionPreference = $previousErrorActionPreference
+
+        if ($addExitCode -eq 0) {
+            $registered = $true
+            $Result.actions.mcp_configured = $true
+            Write-Success "MCP server registered with Claude Code"
+        } else {
+            Write-WarningMsg "claude mcp add returned an error; will use .mcp.json fallback"
+            if ($addOutput) { Write-WarningMsg ($addOutput -join "`n") }
+        }
+    } catch {
+        $ErrorActionPreference = $previousErrorActionPreference
+        Write-WarningMsg "Could not run 'claude mcp add'; will use .mcp.json fallback"
+        Write-WarningMsg "Detail: $_"
+    }
+} else {
+    Write-WarningMsg "claude CLI not found in PATH; will use .mcp.json fallback"
+}
+
+if ($registered) {
+    if (Test-Path $McpJsonPath) {
+        try {
+            Remove-Item -Path $McpJsonPath -Force
+            Write-Info "Removed project-scoped .mcp.json to avoid duplicate server name"
+        } catch {
+            Write-WarningMsg "Could not remove .mcp.json: $_"
         }
     }
-}
-
-$existingConfig = $null
-if (Test-Path $McpSettingsPath) {
-    try {
-        $existingConfig = Get-Content $McpSettingsPath -Raw | ConvertFrom-Json
-        Write-WarningMsg "Existing mcp_settings.json found, merging..."
-    } catch {
-        Write-WarningMsg "Existing mcp_settings.json is invalid, will overwrite"
-    }
-}
-
-if ($existingConfig -and $existingConfig.mcpServers) {
-    $existingConfig.mcpServers | Add-Member -NotePropertyName "codex-subagent" -NotePropertyValue $mcpConfig.mcpServers["codex-subagent"] -Force
-    $finalConfig = $existingConfig
 } else {
-    $finalConfig = $mcpConfig
-}
-
-try {
-    $finalConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $McpSettingsPath -Encoding UTF8
-    $Result.actions.mcp_configured = $true
-    Write-Success "MCP settings written to: $McpSettingsPath"
-} catch {
-    Add-Error "Failed to write MCP settings: $_"
+    $mcpJsonConfig = @{
+        mcpServers = @{
+            "codex-subagent" = @{
+                command = "uvx"
+                args = $mcpServerArgs
+            }
+        }
+    }
+    try {
+        $mcpJsonConfig | ConvertTo-Json -Depth 10 | Set-Content -Path $McpJsonPath -Encoding UTF8
+        $Result.actions.mcp_configured = $true
+        Write-Success "Plugin .mcp.json written to: $McpJsonPath"
+    } catch {
+        Add-Error "Could not write .mcp.json: $_"
+    }
+    Write-Info "Please restart Claude Code and approve the 'codex-subagent' MCP server from .mcp.json"
 }
 Write-Host ""
 
@@ -319,15 +346,21 @@ if (Test-Path $pluginJson) {
     Add-Error "Plugin structure is incorrect"
 }
 
-if (Test-Path $McpSettingsPath) {
-    $mcpContent = Get-Content $McpSettingsPath -Raw
+if (Test-Path $McpJsonPath) {
+    $mcpContent = Get-Content $McpJsonPath -Raw
     if ($mcpContent -match "codex-subagent") {
-        Write-Success "MCP server is configured"
+        Write-Success "MCP server is configured in .mcp.json"
     } else {
-        Add-Error "MCP configuration is missing"
+        Add-Error "MCP configuration is missing in .mcp.json"
     }
+} elseif ($registered) {
+    Write-Success "MCP server is configured via Claude Code user config"
 } else {
-    Add-Error "MCP settings file not found"
+    Add-Error "MCP .mcp.json file not found"
+}
+
+if ($registered) {
+    Write-Success "MCP server registered with Claude Code (active after restart)"
 }
 
 Write-Host ""
@@ -347,7 +380,7 @@ Write-Host ""
 Write-Host "Installation locations:" -ForegroundColor Cyan
 Write-Host "  Plugin:   $pluginTarget"
 Write-Host "  Commands: $CommandsDir"
-Write-Host "  MCP:      $McpSettingsPath"
+Write-Host "  MCP:      $McpJsonPath"
 Write-Host ""
 
 if ($Result.requires_user_action.Count -gt 0) {
